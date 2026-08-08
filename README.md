@@ -53,15 +53,20 @@ Owner can always `veto()` while in `CONFIRMED` and return the vault to `ACTIVE`.
 | `claim`           | write    | Beneficiary pulls their share                    |
 | `get_full_info`   | view     | Human-readable status summary                    |
 
-## Example Usage
+## Why This Is Not a Thin Wrapper
 
-```python
-# channels_json
-[
-  {"url": "https://genlayer.com", "kind": "CORPORATE", "handle": "GenLayer", "weight": 3},
-  {"url": "https://github.com/genlayerlabs", "kind": "CODE_HOST", "handle": "genlayerlabs", "weight": 2},
-  {"url": "https://x.com/GenLayer", "kind": "SOCIAL", "handle": "GenLayer", "weight": 1}
-]
+- Validators independently re-fetch live web pages and re-run the LLM analysis
+- Consensus requires exact match on a canonical decision string derived from evidence counts
+- Multiple independent public sources are required
+- Full lifecycle with owner controls and time-locked release
+- Designed as a reusable primitive, not a one-off demo
 
-# beneficiaries_json
-[{"address": "0x...", "share_bps": 10000}]
+## Deployment
+
+- Network: GenLayer Bradbury Testnet
+- Contract address: `0x030816c1E9ecBE69d28dA60b347f5fa96F2d9763`
+- Explorer: https://explorer-bradbury.genlayer.com/address/0x030816c1E9ecBE69d28dA60b347f5fa96F2d9763
+
+## Source
+
+The exact source deployed on-chain is in `contracts/signalvault.py`.
