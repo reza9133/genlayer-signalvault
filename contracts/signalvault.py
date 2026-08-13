@@ -91,7 +91,7 @@ class SignalVault(gl.Contract):
     last_decision: str
     last_strong: u256
     last_high: u256
-    is_initialized: bool # Added boolean to track initialization
+    is_initialized: bool
 
     def __init__(self):
         self.owner = gl.message.sender_address
@@ -106,11 +106,10 @@ class SignalVault(gl.Contract):
         self.last_decision = ""
         self.last_strong = u256(0)
         self.last_high = u256(0)
-        self.is_initialized = False # Set to false initially
+        self.is_initialized = False
 
     @gl.public.write.payable
     def create_vault(self, target_signal: str, channels_json: str, beneficiaries_json: str, challenge_days: u16):
-        # FIX 1: Prevent re-initialization
         if self.is_initialized:
             raise Exception("Vault is already initialized")
 
@@ -125,7 +124,6 @@ class SignalVault(gl.Contract):
              if not _is_immutable(ch.get("url", "")):
                   raise gl.vm.UserError("Security Error: Channel URLs must be immutable (IPFS, Arweave, or fixed-commit GitHub).")
 
-        # Basic validation of beneficiaries format
         beneficiaries = json.loads(beneficiaries_json)
         if not isinstance(beneficiaries, list) or len(beneficiaries) == 0:
              raise Exception("Must specify at least one beneficiary")
@@ -146,7 +144,7 @@ class SignalVault(gl.Contract):
         self.last_decision = ""
         self.last_strong = u256(0)
         self.last_high = u256(0)
-        self.is_initialized = True # Mark as initialized
+        self.is_initialized = True
 
     @gl.public.write
     def open_check(self):
@@ -215,9 +213,16 @@ class SignalVault(gl.Contract):
     def release(self):
         if self.state != "CONFIRMED":
             raise Exception("Not confirmed")
-        now = u256(gl.message_raw.get("datetime", 0))
+            
+        # ایمن‌سازی دریافت زمان از بلاک‌چین برای جلوگیری از خطای اجرای پایتون در تست‌نت
+        try:
+            now = u256(gl.message_raw["datetime"])
+        except Exception:
+            now = u256(0)
+            
         if now < self.confirmed_at + u256(self.challenge_days * 86400):
             raise Exception("Challenge window still active")
+            
         self.state = "RELEASED"
 
     @gl.public.write
@@ -228,49 +233,21 @@ class SignalVault(gl.Contract):
         caller = str(gl.message.sender_address).lower()
         beneficiaries = json.loads(self.beneficiaries_json)
         
-        # FIX 2: Implement authorization and allocation
         caller_share = 0
         for b in beneficiaries:
              if str(b.get("address", "")).lower() == caller:
                   caller_share = b.get("share", 0)
-                  # Remove them from the list or set share to 0 so they can't claim twice
                   b["share"] = 0
                   break
                   
         if caller_share == 0:
              raise Exception("Caller is not a beneficiary or has already claimed")
 
-        # Calculate their portion based on the *initial* total balance
-        # If we use self.balance, it will decrease with each claim, messing up percentages
-        # We need to track total claimable amount if there are multiple beneficiaries.
-        # For simplicity, assuming balance represents 100% of the funds to distribute.
-        
-        # Note: If the vault allows top-ups, we'd need a separate variable for total_locked
-        # Since there is no top_up function here, self.balance is static until claims start.
-        # To handle multiple claims properly without a total_locked variable, 
-        # we calculate based on the current balance and adjust.
-        # A better approach is calculating the absolute amount based on initial balance.
-        # We'll use a simplified assumption that self.balance holds the total.
-        
-        # We must calculate amount before reducing balance.
-        # To support multiple claims correctly, we should calculate based on total value.
-        # But since we are updating beneficiaries_json to set share to 0, 
-        # we can use the share percentage safely.
-        
-        # Since self.balance decreases, calculating percentage of current balance is wrong.
-        # E.g., 50% of 100 is 50. Balance is now 50. 
-        # Next person with 50% claims 50% of 50 = 25. Incorrect.
-        
-        # Let's use a simpler mechanism since we don't have total_locked.
-        # We will iterate and find the sum of REMAINING shares.
         remaining_shares = sum(b.get("share", 0) for b in beneficiaries)
         
-        # If they are the last to claim, they get everything left to avoid rounding dust
         if remaining_shares == 0:
              amount = self.balance
         else:
-             # This is a basic proportional calculation based on remaining shares
-             # It ensures we don't calculate based on the original 100% if balance changed
              amount = u256(int(self.balance) * caller_share // (caller_share + remaining_shares))
 
         self.beneficiaries_json = json.dumps(beneficiaries)
