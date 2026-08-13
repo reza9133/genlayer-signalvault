@@ -193,7 +193,6 @@ class SignalVault(gl.Contract):
 
         if decision == "CONFIRMED":
             self.state = "CONFIRMED"
-            # Robust extraction for confirmed_at
             try:
                 val = gl.message_raw.get("datetime", 0)
                 if val == 0:
@@ -217,7 +216,6 @@ class SignalVault(gl.Contract):
         if self.state != "CONFIRMED":
             raise Exception("Not confirmed")
             
-        # Robust extraction for now
         try:
             val = gl.message_raw.get("datetime", 0)
             if val == 0:
@@ -228,11 +226,10 @@ class SignalVault(gl.Contract):
             
         deadline = self.confirmed_at + u256(self.challenge_days * 86400)
         
-        # Deadlock Prevention: Bypass timelock if the network fails to provide timestamps
         if now == u256(0) and self.confirmed_at == u256(0):
             pass 
         elif now < deadline:
-            raise Exception("Challenge window still active. Now: " + str(now) + ", Deadline: " + str(deadline))
+            raise Exception("Challenge window still active")
             
         self.state = "RELEASED"
 
@@ -263,7 +260,10 @@ class SignalVault(gl.Contract):
 
         self.beneficiaries_json = json.dumps(beneficiaries)
         self.balance = self.balance - amount
-        gl.transfer(gl.message.sender_address, amount)
+        
+        # Fixed native token transfer using emit_transfer proxy pattern
+        recipient = gl.ContractAt(gl.message.sender_address)
+        recipient.emit_transfer(value=amount)
 
     @gl.public.view
     def get_state(self) -> str:
