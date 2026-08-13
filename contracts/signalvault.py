@@ -214,7 +214,7 @@ class SignalVault(gl.Contract):
         if self.state != "CONFIRMED":
             raise Exception("Not confirmed")
             
-        # ایمن‌سازی دریافت زمان از بلاک‌چین برای جلوگیری از خطای اجرای پایتون در تست‌نت
+        # FIX 3: Safe timestamp parsing to prevent unhandled Python exceptions in testnet
         try:
             now = u256(gl.message_raw["datetime"])
         except Exception:
