@@ -82,7 +82,7 @@ class SignalVault(gl.Contract):
     target_signal: str
     channels_json: str
     beneficiaries_json: str
-    balance: u256
+    vault_balance: u256
     state: str
     challenge_days: u16
     confirmed_at: u256
@@ -97,7 +97,7 @@ class SignalVault(gl.Contract):
         self.target_signal = ""
         self.channels_json = "[]"
         self.beneficiaries_json = "[]"
-        self.balance = u256(0)
+        self.vault_balance = u256(0)
         self.state = "ACTIVE"
         self.challenge_days = u16(14)
         self.confirmed_at = u256(0)
@@ -135,7 +135,7 @@ class SignalVault(gl.Contract):
         self.target_signal = target_signal
         self.channels_json = channels_json
         self.beneficiaries_json = beneficiaries_json
-        self.balance = gl.message.value
+        self.vault_balance = gl.message.value
         self.state = "ACTIVE"
         self.challenge_days = challenge_days
         self.confirmed_at = u256(0)
@@ -254,14 +254,16 @@ class SignalVault(gl.Contract):
         remaining_shares = sum(b.get("share", 0) for b in beneficiaries)
         
         if remaining_shares == 0:
-             amount = self.balance
+             amount = self.vault_balance
         else:
-             amount = u256(int(self.balance) * caller_share // (caller_share + remaining_shares))
+             amount = u256(int(self.vault_balance) * caller_share // (caller_share + remaining_shares))
+
+        if amount > self.balance:
+             raise Exception("Insufficient contract native balance")
 
         self.beneficiaries_json = json.dumps(beneficiaries)
-        self.balance = self.balance - amount
+        self.vault_balance = self.vault_balance - amount
         
-        # Fixed native token transfer using emit_transfer proxy pattern
         recipient = gl.ContractAt(gl.message.sender_address)
         recipient.emit_transfer(value=amount)
 
@@ -271,7 +273,7 @@ class SignalVault(gl.Contract):
 
     @gl.public.view
     def get_balance(self) -> u256:
-        return self.balance
+        return self.vault_balance
 
     @gl.public.view
     def get_target(self) -> str:
@@ -294,5 +296,5 @@ class SignalVault(gl.Contract):
         return (
             "state=" + self.state + " | decision=" + self.last_decision + " | " +
             "strong=" + str(self.last_strong) + " | high=" + str(self.last_high) + " | " +
-            "balance=" + str(self.balance) + " | target=" + self.target_signal
+            "balance=" + str(self.vault_balance) + " | target=" + self.target_signal
         )
