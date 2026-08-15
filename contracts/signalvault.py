@@ -1,11 +1,15 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
+from datetime import datetime, timezone
 import json
 import typing
 import re
 
 MAX_URL_CHARS = 2048
+
+def _now() -> int:
+    return int(datetime.now(timezone.utc).timestamp())
 
 def _is_immutable(url: str) -> bool:
     if not isinstance(url, str):
@@ -76,6 +80,12 @@ Return exactly:
     decision = "CONFIRMED" if (strong >= 2 and high >= 2) else "ACTIVE"
     return f"{decision}|{strong}|{high}|{vector}"
 
+@gl.evm.contract_interface
+class _Payee:
+    class View:
+        pass
+    class Write:
+        pass
 
 class SignalVault(gl.Contract):
     owner: Address
@@ -193,13 +203,7 @@ class SignalVault(gl.Contract):
 
         if decision == "CONFIRMED":
             self.state = "CONFIRMED"
-            try:
-                val = gl.message_raw.get("datetime", 0)
-                if val == 0:
-                    val = gl.message_raw.get("timestamp", 0)
-                self.confirmed_at = u256(int(val))
-            except Exception:
-                self.confirmed_at = u256(0)
+            self.confirmed_at = u256(_now())
         else:
             self.state = "ACTIVE"
 
@@ -216,19 +220,15 @@ class SignalVault(gl.Contract):
         if self.state != "CONFIRMED":
             raise Exception("Not confirmed")
             
-        try:
-            val = gl.message_raw.get("datetime", 0)
-            if val == 0:
-                val = gl.message_raw.get("timestamp", 0)
-            now = u256(int(val))
-        except Exception:
-            now = u256(0)
+        now = u256(_now())
+        
+        # Security enhancement: Fail closed on missing/zero time data
+        if now == u256(0) or self.confirmed_at == u256(0):
+            raise Exception("Time data missing or invalid (fail closed)")
             
         deadline = self.confirmed_at + u256(self.challenge_days * 86400)
         
-        if now == u256(0) and self.confirmed_at == u256(0):
-            pass 
-        elif now < deadline:
+        if now < deadline:
             raise Exception("Challenge window still active")
             
         self.state = "RELEASED"
@@ -238,12 +238,13 @@ class SignalVault(gl.Contract):
         if self.state != "RELEASED":
             raise Exception("Not released")
             
-        caller = str(gl.message.sender_address).lower()
+        caller_addr = gl.message.sender_address
+        caller_str = str(caller_addr).lower()
         beneficiaries = json.loads(self.beneficiaries_json)
         
         caller_share = 0
         for b in beneficiaries:
-             if str(b.get("address", "")).lower() == caller:
+             if str(b.get("address", "")).lower() == caller_str:
                   caller_share = b.get("share", 0)
                   b["share"] = 0
                   break
@@ -264,11 +265,8 @@ class SignalVault(gl.Contract):
         self.beneficiaries_json = json.dumps(beneficiaries)
         self.vault_balance = self.vault_balance - amount
         
-        # TODO: Re-enable native transfer once the testnet infrastructure 
-        # supports direct EOA transfers via emit_transfer.
-        # Logic remains fully secure and state-managed.
-        # recipient = gl.ContractAt(gl.message.sender_address)
-        # recipient.emit_transfer(value=amount)
+        # Payout path activated via standard GenLayer Payee interface
+        _Payee(caller_addr).emit_transfer(value=amount)
 
     @gl.public.view
     def get_state(self) -> str:
