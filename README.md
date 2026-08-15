@@ -13,15 +13,15 @@ It is designed as a high-quality primitive for milestone-based grants, parametri
 - **Closed-schema LLM analysis** with strict relevance + confirmation levels
 - **Exact canonical string consensus** via custom `run_nondet_unsafe`
 - **Conservative state machine**: `ACTIVE → PENDING → CONFIRMED → RELEASED`
-- **Mandatory owner veto** + challenge window before release
-- **Pull-based claim** for beneficiaries
+- **Mandatory owner veto** + challenge window before release (Fails closed on missing time data to prevent premature execution)
+- **Native Pull-based claim** (Standard GenLayer `_Payee` native transfers to active beneficiaries)
 - Clear separation between non-deterministic analysis and deterministic state updates
 
 ## How Consensus Works
 
 1. Anyone can call `open_check()` when the vault is `ACTIVE`.
 2. `adjudicate()` triggers the non-deterministic block:
-   - Every validator independently fetches each channel with `gl.nondet.web.render`
+   - Every validator independently fetches each channel with `gl.nondet.web.get`
    - Runs the same closed-schema LLM prompt
    - Builds a canonical reading vector (`C0:F0:RHIGH:CSTRONG:X0|...`)
    - Derives a final decision (`CONFIRMED` or `ACTIVE`)
@@ -50,16 +50,8 @@ Owner can always `veto()` while in `CONFIRMED` and return the vault to `ACTIVE`.
 | `adjudicate`      | write    | Run multi-validator signal consensus             |
 | `veto`            | write    | Owner cancels a confirmation                     |
 | `release`         | write    | Finalize after challenge window                  |
-| `claim`           | write    | Beneficiary pulls their share                    |
+| `claim`           | write    | Beneficiary pulls their share natively           |
 | `get_full_info`   | view     | Human-readable status summary                    |
-
-## Why This Is Not a Thin Wrapper
-
-- Validators independently re-fetch live web pages and re-run the LLM analysis
-- Consensus requires exact match on a canonical decision string derived from evidence counts
-- Multiple independent public sources are required
-- Full lifecycle with owner controls and time-locked release
-- Designed as a reusable primitive, not a one-off demo
 
 ## Deployment
 
@@ -69,4 +61,4 @@ Owner can always `veto()` while in `CONFIRMED` and return the vault to `ACTIVE`.
 
 ## Source
 
-The exact source deployed on-chain is in `contracts/signalvault.py`.
+The exact source deployed on-chain is in the repository.
