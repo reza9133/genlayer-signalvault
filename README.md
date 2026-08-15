@@ -64,8 +64,8 @@ Owner can always `veto()` while in `CONFIRMED` and return the vault to `ACTIVE`.
 ## Deployment
 
 - Network: GenLayer Bradbury Testnet
-- Contract address: `0x7ba069b6224fF48CBa3490fBa9B0399520efE383`
-- Explorer: https://explorer-bradbury.genlayer.com/address/0x7ba069b6224fF48CBa3490fBa9B0399520efE383
+- Contract address: `0x9f872f7F44C7062F54D344f92B8edd82954E2a38`
+- Explorer: https://explorer-bradbury.genlayer.com/address/0x9f872f7F44C7062F54D344f92B8edd82954E2a38
 
 ## Source
 
